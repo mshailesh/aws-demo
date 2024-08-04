@@ -1,0 +1,30 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  # EC2 Instance
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: ami-0abcdef1234567890  # Replace with your AMI ID
+      KeyName: developer_keypair  # Replace with your key pair name
+      IamInstanceProfile: !Ref InstanceProfile
+      Tags:
+        - Key: Project
+          Value: Demo
+
+  # IAM Instance Profile for EC2 (using existing role)
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - Ref: EC2_Demo_Role  # Reference to the existing IAM role
+
+# Outputs section to provide the instance ID and instance profile
+Outputs:
+  InstanceId:
+    Description: "The Instance ID of the EC2 instance"
+    Value: !Ref MyEC2Instance
+
+  InstanceProfileArn:
+    Description: "The ARN of the IAM instance profile"
+    Value: !GetAtt InstanceProfile.Arn
