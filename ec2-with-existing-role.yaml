@@ -17,7 +17,7 @@ Resources:
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: t2.micro
-      ImageId: ami-0abcdef1234567890  # Replace with your AMI ID
+      ImageId: ami-04a81a99f5ec58529 # Replace with your AMI ID
       KeyName: developer_keypair  # Replace with your key pair name
       IamInstanceProfile: !Ref InstanceProfile
       Tags:
