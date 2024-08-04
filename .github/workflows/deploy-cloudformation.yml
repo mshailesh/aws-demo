@@ -25,4 +25,4 @@ jobs:
           aws cloudformation deploy \
             --template-file ec2-with-existing-role.yaml \
             --stack-name my-ec2-stack \
-            --capabilities CAPABILITY_NAMED_IAM
+            --parameter-overrides ExistingRoleName=EC2_Demo_Role
