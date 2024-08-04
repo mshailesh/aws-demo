@@ -1,5 +1,17 @@
 AWSTemplateFormatVersion: '2010-09-09'
+Parameters:
+  ExistingRoleName:
+    Type: String
+    Description: "The name of the existing IAM role to use for the instance profile."
+
 Resources:
+  # IAM Instance Profile for EC2 (using existing role)
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - Ref: ExistingRoleName  # Reference to the existing IAM role passed as a parameter
+
   # EC2 Instance
   MyEC2Instance:
     Type: AWS::EC2::Instance
@@ -11,13 +23,6 @@ Resources:
       Tags:
         - Key: Project
           Value: Demo
-
-  # IAM Instance Profile for EC2 (using existing role)
-  InstanceProfile:
-    Type: AWS::IAM::InstanceProfile
-    Properties:
-      Roles:
-        - Ref: EC2_Demo_Role  # Reference to the existing IAM role
 
 # Outputs section to provide the instance ID and instance profile
 Outputs:
