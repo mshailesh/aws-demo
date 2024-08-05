@@ -1,14 +1,13 @@
-name: Deploy CloudFormation Stack
+name: Build and Deploy
 
 on:
   push:
     branches:
-      - main  # Trigger deployment on push to the 'main' branch
+      - main
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -18,13 +17,37 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1  # Replace with your AWS region
+          aws-region: us-east-1
 
       - name: Deploy CloudFormation stack
         run: |
-          aws cloudformation deploy \
-            --template-file ec2-with-existing-role.yaml \
-            --stack-name my-ec2-stack \
-            --capabilities CAPABILITY_NAMED_IAM \
-            --parameter-overrides ExistingRoleName=EC2_Demo_Role
+          aws cloudformation create-stack --stack-name my-infrastructure-stack --template-body file://infrastructure.yaml --capabilities CAPABILITY_NAMED_IAM || \
+          aws cloudformation update-stack --stack-name my-infrastructure-stack --template-body file://infrastructure.yaml --capabilities CAPABILITY_NAMED_IAM
 
+      - name: Wait for CloudFormation stack to be created or updated
+        run: |
+          aws cloudformation wait stack-create-complete --stack-name my-infrastructure-stack || \
+          aws cloudformation wait stack-update-complete --stack-name my-infrastructure-stack
+
+      - name: Build with CodeBuild
+        run: |
+          aws codebuild start-build --project-name MyCodeBuildProject
+
+      - name: Wait for CodeBuild to complete
+        run: |
+          BUILD_ID=$(aws codebuild list-builds-for-project --project-name MyCodeBuildProject --query 'ids[0]' --output text)
+          aws codebuild batch-get-builds --ids $BUILD_ID | jq -r '.builds[0].buildStatus' | grep -q 'SUCCEEDED'
+
+      - name: Get latest build artifact
+        id: get-artifact
+        run: |
+          ARTIFACT=$(aws s3 ls s3://my-artifact-bucket/ --recursive | grep 'build-output' | sort | tail -n 1 | awk '{print $4}')
+          echo "ARTIFACT_NAME=${ARTIFACT}" >> $GITHUB_ENV
+
+      - name: Deploy with CodeDeploy
+        run: |
+          aws deploy create-deployment \
+            --application-name MyApp \
+            --deployment-group-name MyDeploymentGroup \
+            --revision revisionType=S3,s3Location={bucket=my-artifact-bucket,key=${{ env.ARTIFACT_NAME }},bundleType=zip} \
+            --deployment-config-name CodeDeployDefault.OneAtATime

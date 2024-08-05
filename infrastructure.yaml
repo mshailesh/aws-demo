@@ -1,0 +1,129 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  # EC2 Instance
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t2.micro
+      ImageId: ami-04a81a99f5ec58529 # Replace with your AMI ID
+      KeyName: developer_keypair  # Replace with your key pair name
+      IamInstanceProfile: !Ref InstanceProfile
+      Tags:
+        - Key: Project
+          Value: Demo
+
+  # IAM Role for EC2
+  EC2Role:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EC2_Demo_Role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+
+  # IAM Instance Profile for EC2
+  InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2Role
+
+  # CodeBuild Project
+  CodeBuildProject:
+    Type: AWS::CodeBuild::Project
+    Properties:
+      Name: MyCodeBuildProject
+      Source:
+        Type: GITHUB
+        Location: https://github.com/mshailesh/aws-demo.git # Replace with your GitHub repo URL
+      Artifacts:
+        Type: S3
+        Location: my-artifact-bucket  # Replace with your S3 bucket name
+        Packaging: ZIP
+        Path: build-output/
+      Environment:
+        ComputeType: BUILD_GENERAL1_SMALL
+        Image: aws/codebuild/standard:5.0
+        Type: LINUX_CONTAINER
+      ServiceRole: !GetAtt CodeBuildRole.Arn
+
+  # IAM Role for CodeBuild
+  CodeBuildRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CodeBuildServiceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codebuild.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3FullAccess
+        - arn:aws:iam::aws:policy/CloudWatchLogsFullAccess
+        - arn:aws:iam::aws:policy/AWSCodeBuildDeveloperAccess
+
+  # CodeDeploy Application
+  CodeDeployApplication:
+    Type: AWS::CodeDeploy::Application
+    Properties:
+      ApplicationName: MyApp
+      ComputePlatform: Server
+
+  # CodeDeploy Deployment Group
+  CodeDeployDeploymentGroup:
+    Type: AWS::CodeDeploy::DeploymentGroup
+    Properties:
+      ApplicationName: !Ref CodeDeployApplication
+      DeploymentGroupName: MyDeploymentGroup
+      ServiceRoleArn: !GetAtt CodeDeployServiceRole.Arn
+      DeploymentConfigName: CodeDeployDefault.OneAtATime
+      Ec2TagFilters:
+        - Key: Project
+          Value: Demo
+          Type: KEY_AND_VALUE
+
+  # IAM Role for CodeDeploy
+  CodeDeployServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: CodeDeployServiceRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: codedeploy.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSCodeDeployRole
+        - arn:aws:iam::aws:policy/AmazonEC2FullAccess
+
+Outputs:
+  InstanceId:
+    Description: "The Instance ID of the EC2 instance"
+    Value: !Ref MyEC2Instance
+
+  InstanceProfileArn:
+    Description: "The ARN of the IAM instance profile"
+    Value: !GetAtt InstanceProfile.Arn
+
+  CodeBuildProjectName:
+    Description: "The name of the CodeBuild project"
+    Value: !Ref CodeBuildProject
+
+  CodeDeployApplicationName:
+    Description: "The name of the CodeDeploy application"
+    Value: !Ref CodeDeployApplication
+
+  CodeDeployDeploymentGroupName:
+    Description: "The name of the CodeDeploy deployment group"
+    Value: !Ref CodeDeployDeploymentGroup
